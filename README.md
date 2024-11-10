@@ -25,7 +25,7 @@ The project uses a generic XAPP SQL schema for the User/Post/Chat/Admin Portal/H
 ## License
 This project is licensed under the Proprietary License.
 
-![Logo](https://i.ibb.co/xmnzMpg/itaeld-logo.png)
+![Logo](https://i.ibb.co/GC3trp4/itaeld-logo.png)
 
 ## Support
 
