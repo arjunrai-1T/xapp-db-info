@@ -1,6 +1,6 @@
 
-# Project Title
-# xapp-db-info
+# Project Name
+### xapp-db-info
 
 ## About
 
