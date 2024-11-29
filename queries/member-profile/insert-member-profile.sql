@@ -1,20 +1,23 @@
 -- Insert user categories
 INSERT INTO USER_CATEGORIES (CATEGORY_NAME,PARENT_CATEGORY_NAME,IS_DELETED , CREATION_DATETIME) 
 VALUES 
-('End User', NULL,'N',CURRENT_TIMESTAMP),
+('End User',        NULL,'N',CURRENT_TIMESTAMP),
 ('Content Creator', NULL,'N', CURRENT_TIMESTAMP),
-('Admins', NULL,'N',CURRENT_TIMESTAMP),
-('Super Admin', ,'Admin','N',CURRENT_TIMESTAMP),
+('Admin',          NULL,'N',CURRENT_TIMESTAMP),
+('Ad Manager',      NULL,'N', CURRENT_TIMESTAMP),
+('Advertisers',     NULL,'N',CURRENT_TIMESTAMP);
+
+
+INSERT INTO USER_CATEGORIES (CATEGORY_NAME,PARENT_CATEGORY_NAME,IS_DELETED , CREATION_DATETIME) 
+VALUES 
+('Super Admin','Admin','N',CURRENT_TIMESTAMP),
 ('Community Admin','Admin','N', CURRENT_TIMESTAMP),
 ('Content Moderator','Admin','N', CURRENT_TIMESTAMP),
 ('Account Admin','Admin','N', CURRENT_TIMESTAMP),
 ('Security Admin','Admin','N', CURRENT_TIMESTAMP),
 ('Editorial Admin','Admin','N', CURRENT_TIMESTAMP),
 ('Technical Admin','Admin','N', CURRENT_TIMESTAMP),
-('Ad Manager',NULL,'N', CURRENT_TIMESTAMP),
 ('Analytics Admin','Admin','N', CURRENT_TIMESTAMP),
-('Analytics Admin','Admin','N', CURRENT_TIMESTAMP),
-('Advertisers', NULL,'N',CURRENT_TIMESTAMP),
 ('Brand/Corporate','Advertisers','N', CURRENT_TIMESTAMP),
 ('Online Retailers','Advertisers','N', CURRENT_TIMESTAMP),
 ('Small and Medium Enterprises','Advertisers','N', CURRENT_TIMESTAMP),
@@ -23,8 +26,29 @@ VALUES
 ('Event Promoters','Advertisers','N', CURRENT_TIMESTAMP),
 ('Freelancers and Service Providers','Advertisers','N', CURRENT_TIMESTAMP),
 ('Real Estate Agents and Property Developers','Advertisers','N', CURRENT_TIMESTAMP),
-('Non-profits and Social Organizations','Advertisers','N', CURRENT_TIMESTAMP)
+('Non-profits and Social Organizations','Advertisers','N', CURRENT_TIMESTAMP),
 ('Educational Institutions and Online Courses','Advertisers','N', CURRENT_TIMESTAMP);
+
+-- Insert User login list
+INSERT INTO USER_LOGIN_INFO (
+    PROFILE_ID,
+    USER_LOGIN_ID,
+    USER_PWD,
+    USER_STATUS_ID,
+    USER_TYPE,
+    IS_DELETED,
+    CREATION_DATETIME
+)
+VALUES (
+    'P12345',                             -- PROFILE_ID (VARCHAR(10))
+    '9903688797',                         -- USER_LOGIN_ID (VARCHAR(200))
+    'hashedpassword1234567890',           -- USER_PWD (VARCHAR(512))
+    1,                                   -- USER_STATUS_ID (INT), assuming 1 exists in USER_STATUS_HASH_LIST
+    'End User',                           -- USER_TYPE (VARCHAR(400)), referencing CATEGORY_NAME from USER_CATEGORIES
+    FALSE,                                -- IS_DELETED (BOOLEAN), setting to FALSE means the user is active
+    CURRENT_TIMESTAMP                     -- CREATION_DATETIME (TIMESTAMP), using current timestamp
+);
+
 
 -- Insert permission list
 INSERT INTO PERMISSIONS (PERMISSION_NAME, IS_DELETED, CREATION_DATETIME)

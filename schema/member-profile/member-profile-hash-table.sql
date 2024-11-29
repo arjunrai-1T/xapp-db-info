@@ -1,4 +1,3 @@
-
 -- This table will store hashs for profile gender Ex. Male/Female/Other
 CREATE TABLE USER_GENDER_HASH_LIST (
     ID     SERIAL PRIMARY KEY,
