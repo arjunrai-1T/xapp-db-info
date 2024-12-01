@@ -34,7 +34,7 @@ INSERT INTO USER_LOGIN_INFO (
     PROFILE_ID,
     USER_LOGIN_ID,
     USER_PWD,
-    USER_STATUS_ID,
+    USER_STATUS,
     USER_TYPE,
     IS_DELETED,
     CREATION_DATETIME
@@ -43,7 +43,7 @@ VALUES (
     'P12345',                             -- PROFILE_ID (VARCHAR(10))
     '9903688797',                         -- USER_LOGIN_ID (VARCHAR(200))
     'hashedpassword1234567890',           -- USER_PWD (VARCHAR(512))
-    1,                                   -- USER_STATUS_ID (INT), assuming 1 exists in USER_STATUS_HASH_LIST
+    'Active',                             -- USER_STATUS (VARCHAR(100)), 
     'End User',                           -- USER_TYPE (VARCHAR(400)), referencing CATEGORY_NAME from USER_CATEGORIES
     FALSE,                                -- IS_DELETED (BOOLEAN), setting to FALSE means the user is active
     CURRENT_TIMESTAMP                     -- CREATION_DATETIME (TIMESTAMP), using current timestamp
@@ -83,7 +83,7 @@ VALUES
 
 
 -- Hash Tables for user 
-INSERT INTO USER_STATUS_HASH_LIST (USER_STATUS_KEY) VALUES
+INSERT INTO USER_STATUS_HASH_LIST (USER_STATUS) VALUES
         ('Active'),
         ('Inactive'),
         ('Blocked'),

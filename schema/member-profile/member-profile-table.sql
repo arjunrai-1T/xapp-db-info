@@ -29,19 +29,67 @@ CREATE TABLE ROLE_PERMISSIONS (
 );
 
 -- This table will store user login information
+-- CREATE TABLE USER_LOGIN_INFO (
+--     PROFILE_ID                VARCHAR(10)  NOT NULL PRIMARY KEY,
+--     USER_LOGIN_ID             VARCHAR(200) NOT NULL UNIQUE,
+--     USER_PWD                  VARCHAR(512) NOT NULL,
+--     USER_STATUS               VARCHAR(100) NOT NULL,
+--     USER_TYPE                 VARCHAR(400) NOT NULL,
+--     IS_DELETED                BOOLEAN      NOT NULL,
+--     CREATION_DATETIME         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+--     FOREIGN KEY (USER_STATUS) REFERENCES USER_STATUS_HASH_LIST (ID),
+--     FOREIGN KEY (USER_TYPE) REFERENCES USER_CATEGORIES (CATEGORY_NAME) ON DELETE CASCADE ON UPDATE CASCADE,
+--     CONSTRAINT check_user_login_id_email_or_mobile 
+--     CHECK (
+--         USER_LOGIN_ID ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'  -- Email pattern
+--         OR
+--         USER_LOGIN_ID ~ '^\d{10}$'  -- 10-digit mobile number pattern
+--     )
+-- );
+
 CREATE TABLE USER_LOGIN_INFO (
-    PROFILE_ID                VARCHAR(10)  NOT NULL,
-    USER_LOGIN_ID             VARCHAR(200) NOT NULL,
+    PROFILE_ID                VARCHAR(10)  NOT NULL PRIMARY KEY,
+    USER_LOGIN_ID             VARCHAR(200) NOT NULL UNIQUE,
     USER_PWD                  VARCHAR(512) NOT NULL,
-    USER_STATUS_ID            INT          NOT NULL,
+    USER_STATUS               VARCHAR(100) NOT NULL,
     USER_TYPE                 VARCHAR(400) NOT NULL,
     IS_DELETED                BOOLEAN      NOT NULL,
-    CREATION_DATETIME         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (PROFILE_ID),
-    UNIQUE      (USER_LOGIN_ID),
-    FOREIGN KEY (USER_STATUS_ID)    REFERENCES USER_STATUS_HASH_LIST (ID),
-    FOREIGN KEY (USER_TYPE)         REFERENCES USER_CATEGORIES (CATEGORY_NAME)  ON DELETE CASCADE ON UPDATE CASCADE
+    CREATION_DATETIME         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (USER_STATUS) REFERENCES USER_STATUS_HASH_LIST (USER_STATUS),
+    FOREIGN KEY (USER_TYPE) REFERENCES USER_CATEGORIES (CATEGORY_NAME) ON DELETE CASCADE ON UPDATE CASCADE
 );
+
+--Trigger
+CREATE OR REPLACE FUNCTION validate_and_check_user_login_id()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Check if USER_LOGIN_ID is either a valid email or a 10-digit mobile number
+    IF NOT (
+        NEW.USER_LOGIN_ID ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'  -- Valid email pattern
+        OR
+        (NEW.USER_LOGIN_ID ~ '^\d{10}$')  -- Valid 10-digit mobile number pattern
+    ) THEN
+        -- Raise an exception if USER_LOGIN_ID is neither a valid email nor a 10-digit mobile number
+        RAISE EXCEPTION 'USER_LOGIN_ID "%" must be a valid email or a 10-digit mobile number', NEW.USER_LOGIN_ID;
+    END IF;
+    
+    -- Check if USER_LOGIN_ID already exists in the table
+    IF EXISTS (SELECT 1 FROM USER_LOGIN_INFO WHERE USER_LOGIN_ID = NEW.USER_LOGIN_ID) THEN
+        -- Raise an exception if the USER_LOGIN_ID already exists
+        RAISE EXCEPTION 'USER_LOGIN_ID "%" already exists', NEW.USER_LOGIN_ID;
+    END IF;
+
+    -- Allow the insert operation to continue if both checks pass
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+--Create the trigger
+CREATE TRIGGER before_insert_user_login_id_check
+BEFORE INSERT ON USER_LOGIN_INFO
+FOR EACH ROW
+EXECUTE FUNCTION validate_and_check_user_login_id();
+
 
 -- This table will store user basic information Ex. Name/Gender/Birthday
 CREATE TABLE USER_BASIC_INFO (
