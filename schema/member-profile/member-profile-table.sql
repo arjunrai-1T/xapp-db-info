@@ -53,13 +53,13 @@ CREATE TABLE USER_LOGIN_INFO (
     USER_PWD                  VARCHAR(512) NOT NULL,
     USER_STATUS               VARCHAR(100) NOT NULL,
     USER_TYPE                 VARCHAR(400) NOT NULL,
-    IS_DELETED                BOOLEAN      NOT NULL,
+    IS_DELETED                BOOLEAN      NOT NULL DEFAULT FALSE,
     CREATION_DATETIME         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (USER_STATUS) REFERENCES USER_STATUS_HASH_LIST (USER_STATUS),
     FOREIGN KEY (USER_TYPE) REFERENCES USER_CATEGORIES (CATEGORY_NAME) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
---Trigger
+--Trigger for valid login id length / already Exist / valid data
 CREATE OR REPLACE FUNCTION validate_and_check_user_login_id()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -84,11 +84,32 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
---Create the trigger
+--Register the trigger for it
 CREATE TRIGGER before_insert_user_login_id_check
 BEFORE INSERT ON USER_LOGIN_INFO
 FOR EACH ROW
 EXECUTE FUNCTION validate_and_check_user_login_id();
+
+--Trigger for USER_LOGIN_INFO status & is deleted default value
+CREATE OR REPLACE FUNCTION set_default_values_user_login_info()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Set default values if not provided
+    IF NEW.USER_STATUS IS NULL THEN
+        NEW.USER_STATUS := 'Active';
+    END IF;
+
+    -- Return the new row with default values set
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+--Register Trigger
+CREATE TRIGGER set_default_values_before_insert
+BEFORE INSERT ON USER_LOGIN_INFO
+FOR EACH ROW
+EXECUTE FUNCTION set_default_values_user_login_info()
+
 
 
 -- This table will store user basic information Ex. Name/Gender/Birthday
