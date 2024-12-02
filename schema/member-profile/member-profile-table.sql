@@ -89,11 +89,11 @@ CREATE TABLE USER_CONTACT_INFO (
 
 --This table will store user session information
 CREATE TABLE user_sessions (
-    user_login_id VARCHAR(255) NOT NULL,  -- User's login ID (can be a username or email)
-    session_token VARCHAR(400) NOT NULL,  -- The session token used for authentication
-    expiration_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP + INTERVAL '1 hour',  -- Default value is 1 hour from the current time,The expiration time of the session (using TIMESTAMP in PostgreSQL)
-    login_datetime TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,  -- Default to current timestamp
-    logout_datetime TIMESTAMP,             -- The date and time when the user logged out (nullable, using TIMESTAMP)
+    user_login_id VARCHAR(255)  NOT NULL,  -- User's login ID (can be a username or email)
+    session_token VARCHAR(400)  NOT NULL,  -- The session token used for authentication
+    expiration_time TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP + INTERVAL '1 hour',  -- Default value is 1 hour from the current time,The expiration time of the session (using TIMESTAMP in PostgreSQL)
+    login_datetime TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,  -- Default to current timestamp
+    logout_datetime TIMESTAMP   DEFAULT NULL,  -- Explicitly specify NULL as the default value for logout_datetime,             
     CONSTRAINT pk_user_sessions PRIMARY KEY (user_login_id, session_token, login_datetime),  -- Composite Primary Key
     CONSTRAINT fk_user_login_id FOREIGN KEY (user_login_id) REFERENCES USER_LOGIN_INFO(USER_LOGIN_ID) -- Foreign Key Constraint
 );
