@@ -95,11 +95,11 @@ CREATE TABLE USER_SESSION_KEY (
 );
 
 CREATE TABLE USER_SESSIONS (
-    USER_LOGIN_ID   VARCHAR(255)  NOT NULL,  -- User's login ID (can be a username or email)
-    SESSION_TOKEN   VARCHAR(400)  NOT NULL,  -- The session token used for authentication
-    EXPIRATION_TIME TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP + INTERVAL '1 hour',  -- Default value is 1 hour from the current time
-    LOGIN_DATETIME  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,  -- Default to current timestamp
-    LOGOUT_DATETIME TIMESTAMP   DEFAULT NULL,  -- Explicitly specify NULL as the default value for logout_datetime
+    USER_LOGIN_ID   VARCHAR(255)  NOT NULL,                                                  -- User's login ID (can be a username or email)
+    SESSION_TOKEN   VARCHAR(400)  NOT NULL,                                                  -- The session token used for authentication
+    EXPIRATION_TIME TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP + INTERVAL '1 hour',      -- Default value is 1 hour from the current time
+    LOGIN_DATETIME  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,                          -- Default to current timestamp
+    LOGOUT_DATETIME TIMESTAMP   DEFAULT NULL,                                                -- Explicitly specify NULL as the default value for logout_datetime
     CONSTRAINT PK_USER_SESSIONS PRIMARY KEY (USER_LOGIN_ID, SESSION_TOKEN, LOGIN_DATETIME),  -- Composite Primary Key
     CONSTRAINT FK_USER_LOGIN_ID FOREIGN KEY (USER_LOGIN_ID) REFERENCES USER_LOGIN_INFO(USER_LOGIN_ID)  -- Foreign Key Constraint
 );
