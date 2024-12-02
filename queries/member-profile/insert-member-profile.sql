@@ -29,6 +29,10 @@ VALUES
 ('Non-profits and Social Organizations','Advertisers','N', CURRENT_TIMESTAMP),
 ('Educational Institutions and Online Courses','Advertisers','N', CURRENT_TIMESTAMP);
 
+--User session (get current key from https://randomkeygen.com/)
+INSERT INTO USER_SESSION_KEY (SECRET_KEY)
+VALUES ('8BAD54696E68645DAAB6AC6CD5AA5');
+
 -- Insert User login list
 INSERT INTO USER_LOGIN_INFO (
     PROFILE_ID,
