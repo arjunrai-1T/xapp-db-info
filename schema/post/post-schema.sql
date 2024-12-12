@@ -12,7 +12,7 @@ CREATE TABLE POST_STATUS_HASH_LIST (
 
 -- Table to store the details of posts
 CREATE TABLE POST_BASIC (
-    POST_ID           VARCHAR(50) PRIMARY KEY, 
+    POST_ID           VARCHAR(30) PRIMARY KEY, 
     POST_TYPE         VARCHAR(400) NOT NULL, 
     POST_STATUS       VARCHAR(20) NOT NULL,
     POST_PRIVACY      VARCHAR(20) NOT NULL,
@@ -20,7 +20,7 @@ CREATE TABLE POST_BASIC (
     POST_TITLE        TEXT NOT NULL,
     POST_DESC         TEXT NOT NULL,
     POST_LOCATION     VARCHAR(600),
-    POST_PARENT       VARCHAR(50),
+    POST_PARENT       VARCHAR(30),
     POST_ISDELETED    BOOLEAN NOT NULL DEFAULT FALSE,
     POST_HAVEANYCHILD BOOLEAN NOT NULL DEFAULT FALSE,
     POST_HAVEANYIMAGES BOOLEAN DEFAULT FALSE,
@@ -247,6 +247,36 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Table to store the available comment status (Active, Inactive, Blocked, Deleted, etc.)
+CREATE TABLE COMMENT_STATUS_HASH_LIST (
+    ID               SERIAL PRIMARY KEY,
+    COMMENT_STATUS   VARCHAR(50) NOT NULL UNIQUE  -- Use a smaller size for the status name
+);
+
+-- Table for storing comments on posts
+CREATE TABLE POST_COMMENT (
+    COMMENT_ID            VARCHAR(30) PRIMARY KEY,  -- Using UUID for unique and scalable comment IDs
+    COMMENT_HAVEANYCHILD  BOOLEAN DEFAULT FALSE,  -- Whether the comment has any child comments
+    COMMENT_PARENT        VARCHAR(30) DEFAULT NULL,  -- Parent comment ID (nullable), UUID for scalability
+    PROFILE_ID            VARCHAR(30) NOT NULL,  -- Profile ID (user)
+    POST_ID               VARCHAR(30) NOT NULL,  -- Post ID (reference to the post)
+    COMMENT_STATEMENT     TEXT NOT NULL,  -- Comment text
+    COMMENT_STATUS        VARCHAR(50) NOT NULL,  -- COMMENT_STATUS references COMMENT_STATUS_HASH_LIST
+    COMMENT_HAVEANYIMAGES BOOLEAN DEFAULT FALSE,  -- Whether the comment has images
+    COMMENT_NUMBEROFIMAGES INTEGER DEFAULT 0,  -- Number of images in the comment
+    COMMENT_HAVEANYVIDEOS BOOLEAN DEFAULT FALSE,  -- Whether the comment has videos
+    COMMENT_NUMBEROFVIDEOS INTEGER DEFAULT 0,  -- Number of videos in the comment
+    CREATION_DATETIME     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,  -- Creation datetime
+    -- Foreign key constraints
+    CONSTRAINT fk_post    FOREIGN KEY (POST_ID) REFERENCES POST_BASIC (POST_ID) ON DELETE CASCADE,  -- Foreign key to POST_BASIC
+    CONSTRAINT fk_profile FOREIGN KEY (PROFILE_ID) REFERENCES USER_LOGIN_INFO (PROFILE_ID) ON DELETE CASCADE,  -- Foreign key to USER_LOGIN_INFO
+    CONSTRAINT fk_comment_status FOREIGN KEY (COMMENT_STATUS) REFERENCES COMMENT_STATUS_HASH_LIST (COMMENT_STATUS) ON DELETE CASCADE,  -- Foreign key to COMMENT_STATUS_HASH_LIST
+    CONSTRAINT chk_comment_images CHECK (COMMENT_NUMBEROFIMAGES >= 0),  -- Ensure non-negative image count
+    CONSTRAINT chk_comment_videos CHECK (COMMENT_NUMBEROFVIDEOS >= 0)  -- Ensure non-negative video count
+);
+
+-- Optional: Create index for COMMENT_PARENT for better performance in threaded comments
+CREATE INDEX idx_comment_parent ON POST_COMMENT (COMMENT_PARENT);
 
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
