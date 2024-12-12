@@ -270,32 +270,142 @@ CREATE TABLE POST_COMMENT (
     -- Foreign key constraints
     CONSTRAINT fk_post    FOREIGN KEY (POST_ID) REFERENCES POST_BASIC (POST_ID) ON DELETE CASCADE,  -- Foreign key to POST_BASIC
     CONSTRAINT fk_profile FOREIGN KEY (PROFILE_ID) REFERENCES USER_LOGIN_INFO (PROFILE_ID) ON DELETE CASCADE,  -- Foreign key to USER_LOGIN_INFO
-    CONSTRAINT fk_comment_status FOREIGN KEY (COMMENT_STATUS) REFERENCES COMMENT_STATUS_HASH_LIST (COMMENT_STATUS) ON DELETE CASCADE,  -- Foreign key to COMMENT_STATUS_HASH_LIST
-    CONSTRAINT chk_comment_images CHECK (COMMENT_NUMBEROFIMAGES >= 0),  -- Ensure non-negative image count
-    CONSTRAINT chk_comment_videos CHECK (COMMENT_NUMBEROFVIDEOS >= 0)  -- Ensure non-negative video count
+    CONSTRAINT fk_comment_status FOREIGN KEY (COMMENT_STATUS) REFERENCES COMMENT_STATUS_HASH_LIST (COMMENT_STATUS) ON DELETE CASCADE  -- Foreign key to COMMENT_STATUS_HASH_LIST
 );
 
--- Optional: Create index for COMMENT_PARENT for better performance in threaded comments
+-- Index for parent-child relationship (important for threaded comments)
 CREATE INDEX idx_comment_parent ON POST_COMMENT (COMMENT_PARENT);
+
+-- Index for fetching comments for a specific post
+CREATE INDEX idx_post_comments ON POST_COMMENT (POST_ID);
+
+-- Index for sorting comments by creation date (e.g., for displaying comments in order)
+CREATE INDEX idx_creation_datetime ON POST_COMMENT (CREATION_DATETIME);
+
+
+-- Table to store media (images/videos) attached to comments
+CREATE TABLE COMMENT_MEDIA (
+    COMMENT_ID           VARCHAR(30) NOT NULL,  -- Reference to the comment
+    COMMENT_MEDIA_TYPE   VARCHAR(20) NOT NULL,  -- 'image' or 'video'
+    COMMENT_MEDIA_NAME   VARCHAR(2000) NOT NULL,         -- Name of the media file
+    COMMENT_MEDIA_URL    TEXT NOT NULL,         -- URL or path to the media file
+    CREATION_DATETIME    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- Foreign key constraint
+    CONSTRAINT fk_comment FOREIGN KEY (COMMENT_ID) REFERENCES POST_COMMENT (COMMENT_ID) ON DELETE CASCADE
+);
+
+CREATE TABLE POST_MEDIA (
+    POST_ID           VARCHAR(30) NOT NULL,            -- Post ID (reference to the post)
+    POST_MEDIA_ID     VARCHAR(30) NOT NULL,            -- Unique media ID for each media file
+    POST_MEDIA_TYPE   VARCHAR(200) NOT NULL,           -- Media type (e.g., image, video, audio)
+    POST_MEDIA_NAME   VARCHAR(2000) NOT NULL,          -- Name of the media file
+    POST_MEDIA_URL    TEXT NOT NULL,                   -- URL or path to the media file
+    CREATION_DATETIME TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Creation datetime
+    -- Foreign key constraint (optional, depending on your data model)
+    CONSTRAINT fk_post FOREIGN KEY (POST_ID) REFERENCES POST_BASIC (POST_ID) ON DELETE CASCADE
+);
+
+
+CREATE TABLE NAS_SERVERS (
+    NAS_SERVER_ID VARCHAR(60) PRIMARY KEY,  -- Custom identifier for each NAS server (e.g., "NAS_1")
+    NAS_SERVER_IP INET NOT NULL,             -- Store the IP address of the NAS server (IPv4 or IPv6)
+    NAS_SERVER_PATH_PREFIX VARCHAR(255),    -- Common path prefix for all files on the NAS server (optional)
+    NAS_SERVER_NAME VARCHAR(100)            -- Name or identifier for the NAS server
+);
+
+CREATE TABLE USER_NAS_MAPPING (
+    USER_PROFILE_ID VARCHAR(60) PRIMARY KEY,  -- Reference to the user profile
+    NAS_SERVER_ID   VARCHAR(60) NOT NULL,     -- Reference to the NAS server
+    BASE_URL_PATH   VARCHAR(255) NOT NULL,    -- Base URL path for accessing the media on the NAS
+    -- Foreign key constraints
+    CONSTRAINT fk_user_profile FOREIGN KEY (USER_PROFILE_ID) REFERENCES USER_LOGIN_INFO (PROFILE_ID) ON DELETE CASCADE,  -- Assuming USER_LOGIN_INFO holds the profile data
+    CONSTRAINT fk_nas_server FOREIGN KEY (NAS_SERVER_ID) REFERENCES NAS_SERVERS (NAS_SERVER_ID) ON DELETE CASCADE   -- Reference to NAS server
+);
+
+CREATE OR REPLACE FUNCTION store_post_media(
+    p_post_id           VARCHAR,
+    p_post_media_id     VARCHAR,
+    p_post_media_type   VARCHAR,
+    p_post_media_name   VARCHAR,
+    p_user_profile_id   VARCHAR
+)
+RETURNS TEXT AS
+$$
+DECLARE
+    v_base_url_path VARCHAR(255);
+    v_post_media_url TEXT;
+BEGIN
+    -- Begin a transaction to ensure data consistency
+    BEGIN
+        -- Validate input parameters
+        IF p_post_id IS NULL OR p_post_media_id IS NULL OR p_post_media_type IS NULL OR p_post_media_name IS NULL OR p_user_profile_id IS NULL THEN
+            RETURN 'Failure: Missing required parameters.';
+        END IF;
+
+        -- Fetch the base URL path for the given user profile ID from USER_NAS_MAPPING
+        SELECT BASE_URL_PATH
+        INTO v_base_url_path
+        FROM USER_NAS_MAPPING
+        WHERE USER_PROFILE_ID = p_user_profile_id
+        LIMIT 1;
+
+        -- If no matching NAS mapping found, raise an exception
+        IF v_base_url_path IS NULL THEN
+            RETURN 'Failure: No NAS mapping found for user profile ID: ' || p_user_profile_id;
+        END IF;
+
+        -- Construct the POST_MEDIA_URL by concatenating the base URL and media file name
+        v_post_media_url := v_base_url_path || '/' || p_post_media_name;
+
+        -- Insert the record into POST_MEDIA
+        INSERT INTO POST_MEDIA (
+            POST_ID,
+            POST_MEDIA_ID,
+            POST_MEDIA_TYPE,
+            POST_MEDIA_NAME,
+            POST_MEDIA_URL,
+            CREATION_DATETIME
+        )
+        VALUES (
+            p_post_id,
+            p_post_media_id,
+            p_post_media_type,
+            p_post_media_name,
+            v_post_media_url,
+            CURRENT_TIMESTAMP
+        );
+
+        -- If insert is successful, return a success message
+        RETURN 'Success: Media stored successfully for post ID ' || p_post_id;
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            -- Handle any errors by rolling back and returning a failure message
+            RETURN 'Failure: An error occurred while storing media. ' || SQLERRM;
+    END;
+END;
+$$ LANGUAGE plpgsql;
+
+
 
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-CREATE TABLE `POST_COMMENT` (
-  `COMMENT_ID` varchar(10) NOT NULL,
-  `PROFILE_ID` varchar(10) NOT NULL,
-  `POST_ID` varchar(10) NOT NULL,
-  `COMMENT_STATUS` varchar(100) NOT NULL,
-  `COMMENT_PARENT` varchar(10) DEFAULT NULL,
-  `COMMENT_HAVEANYCHILD` tinyint(1) DEFAULT '0',
-  `COMMENT_HAVEANYIMAGES` tinyint(1) DEFAULT '0',
-  `COMMENT_NUMBEROFIMAGES` varchar(10) DEFAULT '0',
-  `COMMENT_HAVEANYVIDEOS` tinyint(1) DEFAULT '0',
-  `COMMENT_NUMBEROFVIDEOS` varchar(10) DEFAULT '0',
-  `COMMENT_STATEMENT` text NOT NULL,
-  `CREATION_DATE` date DEFAULT NULL,
-  `CREATION_TIME` time DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+-- CREATE TABLE `POST_COMMENT` (
+--   `COMMENT_ID` varchar(10) NOT NULL,
+--   `PROFILE_ID` varchar(10) NOT NULL,
+--   `POST_ID` varchar(10) NOT NULL,
+--   `COMMENT_STATUS` varchar(100) NOT NULL,
+--   `COMMENT_PARENT` varchar(10) DEFAULT NULL,
+--   `COMMENT_HAVEANYCHILD` tinyint(1) DEFAULT '0',
+--   `COMMENT_HAVEANYIMAGES` tinyint(1) DEFAULT '0',
+--   `COMMENT_NUMBEROFIMAGES` varchar(10) DEFAULT '0',
+--   `COMMENT_HAVEANYVIDEOS` tinyint(1) DEFAULT '0',
+--   `COMMENT_NUMBEROFVIDEOS` varchar(10) DEFAULT '0',
+--   `COMMENT_STATEMENT` text NOT NULL,
+--   `CREATION_DATE` date DEFAULT NULL,
+--   `CREATION_TIME` time DEFAULT NULL
+-- ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 -- CREATE TABLE `POST_COMMENT_LIKE_DISLIKE` (
@@ -307,26 +417,26 @@ CREATE TABLE `POST_COMMENT` (
 -- ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
-CREATE TABLE `POST_COMMENT_MEDIA` (
-  `COMMENT_ID` varchar(10) NOT NULL,
-  `COMMENT_MEDIA_ID` varchar(10) NOT NULL,
-  `COMMENT_MEDIA_TYPE` varchar(200) NOT NULL,
-  `COMMENT_MEDIA_NAME` varchar(200) NOT NULL,
-  `ALBUM_ID` varchar(10) NOT NULL,
-  `CREATION_DATE` date DEFAULT NULL,
-  `CREATION_TIME` time DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+-- CREATE TABLE `POST_COMMENT_MEDIA` (
+--   `COMMENT_ID` varchar(10) NOT NULL,
+--   `COMMENT_MEDIA_ID` varchar(10) NOT NULL,
+--   `COMMENT_MEDIA_TYPE` varchar(200) NOT NULL,
+--   `COMMENT_MEDIA_NAME` varchar(200) NOT NULL,
+--   `ALBUM_ID` varchar(10) NOT NULL,
+--   `CREATION_DATE` date DEFAULT NULL,
+--   `CREATION_TIME` time DEFAULT NULL
+-- ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
-CREATE TABLE `POST_MEDIA` (
-  `POST_ID` varchar(10) NOT NULL,
-  `POST_MEDIA_ID` varchar(10) NOT NULL,
-  `POST_MEDIA_TYPE` varchar(200) NOT NULL,
-  `POST_MEDIA_NAME` varchar(2000) NOT NULL,
-  `ALBUM_ID` varchar(10) NOT NULL,
-  `CREATION_DATE` date DEFAULT NULL,
-  `CREATION_TIME` time DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+-- CREATE TABLE `POST_MEDIA` (
+--   `POST_ID` varchar(10) NOT NULL,
+--   `POST_MEDIA_ID` varchar(10) NOT NULL,
+--   `POST_MEDIA_TYPE` varchar(200) NOT NULL,
+--   `POST_MEDIA_NAME` varchar(2000) NOT NULL,
+--   `ALBUM_ID` varchar(10) NOT NULL,
+--   `CREATION_DATE` date DEFAULT NULL,
+--   `CREATION_TIME` time DEFAULT NULL
+-- ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 
