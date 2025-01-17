@@ -42,6 +42,17 @@ CREATE TABLE POST_BASIC (
     CONSTRAINT fk_post_status FOREIGN KEY (POST_STATUS) REFERENCES POST_STATUS_HASH_LIST (POST_STATUS) ON DELETE CASCADE
 );
 
+CREATE TABLE POST_MEDIA (
+    POST_ID           VARCHAR(30) NOT NULL,            -- Post ID (reference to the post)
+    POST_MEDIA_ID     VARCHAR(30) NOT NULL,            -- Unique media ID for each media file
+    POST_MEDIA_TYPE   VARCHAR(200) NOT NULL,           -- Media type (e.g., image, video, audio)
+    POST_MEDIA_NAME   VARCHAR(2000) NOT NULL,          -- Name of the media file
+    POST_MEDIA_URL    TEXT NOT NULL,                   -- URL or path to the media file
+    CREATION_DATETIME TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Creation datetime
+    -- Foreign key constraint (optional, depending on your data model)
+    CONSTRAINT fk_post FOREIGN KEY (POST_ID) REFERENCES POST_BASIC (POST_ID) ON DELETE CASCADE
+);
+
 -- Table to store individual ratings for each post, given by each user
 CREATE TABLE POST_RATINGS (
     POST_ID          VARCHAR(50) NOT NULL,              -- Reference to the post being rated
@@ -294,33 +305,6 @@ CREATE TABLE COMMENT_MEDIA (
     CONSTRAINT fk_comment FOREIGN KEY (COMMENT_ID) REFERENCES POST_COMMENT (COMMENT_ID) ON DELETE CASCADE
 );
 
-CREATE TABLE POST_MEDIA (
-    POST_ID           VARCHAR(30) NOT NULL,            -- Post ID (reference to the post)
-    POST_MEDIA_ID     VARCHAR(30) NOT NULL,            -- Unique media ID for each media file
-    POST_MEDIA_TYPE   VARCHAR(200) NOT NULL,           -- Media type (e.g., image, video, audio)
-    POST_MEDIA_NAME   VARCHAR(2000) NOT NULL,          -- Name of the media file
-    POST_MEDIA_URL    TEXT NOT NULL,                   -- URL or path to the media file
-    CREATION_DATETIME TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Creation datetime
-    -- Foreign key constraint (optional, depending on your data model)
-    CONSTRAINT fk_post FOREIGN KEY (POST_ID) REFERENCES POST_BASIC (POST_ID) ON DELETE CASCADE
-);
-
-
-CREATE TABLE NAS_SERVERS (
-    NAS_SERVER_ID VARCHAR(60) PRIMARY KEY,  -- Custom identifier for each NAS server (e.g., "NAS_1")
-    NAS_SERVER_IP INET NOT NULL,             -- Store the IP address of the NAS server (IPv4 or IPv6)
-    NAS_SERVER_PATH_PREFIX VARCHAR(255),    -- Common path prefix for all files on the NAS server (optional)
-    NAS_SERVER_NAME VARCHAR(100)            -- Name or identifier for the NAS server
-);
-
-CREATE TABLE USER_NAS_MAPPING (
-    USER_PROFILE_ID VARCHAR(60) PRIMARY KEY,  -- Reference to the user profile
-    NAS_SERVER_ID   VARCHAR(60) NOT NULL,     -- Reference to the NAS server
-    BASE_URL_PATH   VARCHAR(255) NOT NULL,    -- Base URL path for accessing the media on the NAS
-    -- Foreign key constraints
-    CONSTRAINT fk_user_profile FOREIGN KEY (USER_PROFILE_ID) REFERENCES USER_LOGIN_INFO (PROFILE_ID) ON DELETE CASCADE,  -- Assuming USER_LOGIN_INFO holds the profile data
-    CONSTRAINT fk_nas_server FOREIGN KEY (NAS_SERVER_ID) REFERENCES NAS_SERVERS (NAS_SERVER_ID) ON DELETE CASCADE   -- Reference to NAS server
-);
 
 CREATE OR REPLACE FUNCTION store_post_media(
     p_post_id           VARCHAR,
@@ -385,9 +369,6 @@ BEGIN
     END;
 END;
 $$ LANGUAGE plpgsql;
-
-
-
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
