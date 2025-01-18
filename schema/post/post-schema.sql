@@ -81,47 +81,7 @@ CREATE TABLE POST_RATING_AGGREGATES (
 CREATE INDEX idx_post_ratings_post_id ON POST_RATINGS (POST_ID);
 CREATE INDEX idx_post_ratings_profile_id ON POST_RATINGS (PROFILE_ID);
 
--- Function to update the aggregate ratings incrementally
-CREATE OR REPLACE FUNCTION update_post_rating_aggregate() 
-RETURNS TRIGGER AS $$
-DECLARE
-    current_rating_count INTEGER;
-    current_average_rating NUMERIC(3, 2);
-BEGIN
-    -- Fetch the current aggregate values for the post
-    SELECT RATING_COUNT, AVERAGE_RATING
-    INTO current_rating_count, current_average_rating
-    FROM POST_RATING_AGGREGATES
-    WHERE POST_ID = NEW.POST_ID
-    FOR UPDATE;
 
-    -- If no aggregate data exists, initialize it
-    IF NOT FOUND THEN
-        current_rating_count := 0;
-        current_average_rating := 0;
-        -- Insert a new row into POST_RATING_AGGREGATES if it doesn't exist
-        INSERT INTO POST_RATING_AGGREGATES (POST_ID, AVERAGE_RATING, RATING_COUNT)
-        VALUES (NEW.POST_ID, 0, 0);
-    END IF;
-
-    -- Update aggregate count and average (incremental)
-    IF TG_OP = 'INSERT' THEN
-        -- New rating added
-        UPDATE POST_RATING_AGGREGATES
-        SET RATING_COUNT = current_rating_count + 1,
-            AVERAGE_RATING = ((current_average_rating * current_rating_count) + NEW.RATING_VALUE) / (current_rating_count + 1)
-        WHERE POST_ID = NEW.POST_ID;
-    ELSIF TG_OP = 'UPDATE' THEN
-        -- Rating updated
-        UPDATE POST_RATING_AGGREGATES
-        SET RATING_COUNT = current_rating_count,  -- Rating count stays the same
-            AVERAGE_RATING = ((current_average_rating * current_rating_count) - OLD.RATING_VALUE + NEW.RATING_VALUE) / current_rating_count
-        WHERE POST_ID = NEW.POST_ID;
-    END IF;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
 
 -- Trigger to call the function after inserting or updating a rating
 CREATE TRIGGER trigger_update_post_rating_aggregate
@@ -155,24 +115,6 @@ CREATE TABLE POST_LIKE_DISLIKE_SUMMARY (
     -- Foreign key constraint
     CONSTRAINT fk_post_summary FOREIGN KEY (POST_ID) REFERENCES POST_BASIC (POST_ID) ON DELETE CASCADE
 );
-
--- Trigger function to update the aggregate counts
-CREATE OR REPLACE FUNCTION update_post_like_dislike_summary() 
-RETURNS TRIGGER AS $$
-BEGIN
-    -- Increment the like or dislike count based on the action
-    IF NEW.ACTION = 'LIKE' THEN
-        UPDATE POST_LIKE_DISLIKE_SUMMARY
-        SET TOTAL_LIKES = TOTAL_LIKES + 1
-        WHERE POST_ID = NEW.POST_ID;
-    ELSIF NEW.ACTION = 'DISLIKE' THEN
-        UPDATE POST_LIKE_DISLIKE_SUMMARY
-        SET TOTAL_DISLIKE = TOTAL_DISLIKE + 1
-        WHERE POST_ID = NEW.POST_ID;
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
 
 -- Trigger to execute after an insert into POST_LIKE_DISLIKE_DETAILS
 CREATE TRIGGER trigger_update_post_like_dislike_summary
@@ -228,35 +170,7 @@ CREATE INDEX idx_user_video_views_profile_id ON POST_VIDEO_VIEW_DETAILS (PROFILE
 CREATE INDEX idx_view_datetime ON POST_VIDEO_VIEW_DETAILS (VIEW_DATETIME);
 
 --function
-CREATE OR REPLACE FUNCTION record_video_view(
-    p_post_id VARCHAR(50),
-    p_profile_id VARCHAR(50),
-    p_view_start_datetime TIMESTAMP,
-    p_view_end_datetime TIMESTAMP
-)
-RETURNS VOID AS $$
-DECLARE
-    v_view_duration INTEGER;
-BEGIN
-    -- Step 1: Calculate the view duration
-    v_view_duration := EXTRACT(EPOCH FROM (p_view_end_datetime - p_view_start_datetime))::INTEGER;
-    
-    -- Step 2: Insert the view into POST_VIDEO_VIEW_DETAILS
-    INSERT INTO POST_VIDEO_VIEW_DETAILS (POST_ID, PROFILE_ID, VIEW_START_DATETIME, VIEW_END_DATETIME, VIEW_DURATION)
-    VALUES (p_post_id, p_profile_id, p_view_start_datetime, p_view_end_datetime, v_view_duration);
 
-    -- Step 3: Only update views if the view duration exceeds 30 seconds
-    IF v_view_duration >= 30 THEN
-        -- Step 4: Update the aggregated views count in POST_VIDEO_VIEWS
-        UPDATE POST_VIDEO_VIEWS
-        SET TOTAL_VIEWS = TOTAL_VIEWS + 1,
-            UNIQUE_VIEWS = UNIQUE_VIEWS + 1
-        WHERE POST_ID = p_post_id;
-    END IF;
-    
-    RETURN;
-END;
-$$ LANGUAGE plpgsql;
 
 -- Table to store the available comment status (Active, Inactive, Blocked, Deleted, etc.)
 CREATE TABLE COMMENT_STATUS_HASH_LIST (
@@ -305,70 +219,6 @@ CREATE TABLE COMMENT_MEDIA (
     CONSTRAINT fk_comment FOREIGN KEY (COMMENT_ID) REFERENCES POST_COMMENT (COMMENT_ID) ON DELETE CASCADE
 );
 
-
-CREATE OR REPLACE FUNCTION store_post_media(
-    p_post_id           VARCHAR,
-    p_post_media_id     VARCHAR,
-    p_post_media_type   VARCHAR,
-    p_post_media_name   VARCHAR,
-    p_user_profile_id   VARCHAR
-)
-RETURNS TEXT AS
-$$
-DECLARE
-    v_base_url_path VARCHAR(255);
-    v_post_media_url TEXT;
-BEGIN
-    -- Begin a transaction to ensure data consistency
-    BEGIN
-        -- Validate input parameters
-        IF p_post_id IS NULL OR p_post_media_id IS NULL OR p_post_media_type IS NULL OR p_post_media_name IS NULL OR p_user_profile_id IS NULL THEN
-            RETURN 'Failure: Missing required parameters.';
-        END IF;
-
-        -- Fetch the base URL path for the given user profile ID from USER_NAS_MAPPING
-        SELECT BASE_URL_PATH
-        INTO v_base_url_path
-        FROM USER_NAS_MAPPING
-        WHERE USER_PROFILE_ID = p_user_profile_id
-        LIMIT 1;
-
-        -- If no matching NAS mapping found, raise an exception
-        IF v_base_url_path IS NULL THEN
-            RETURN 'Failure: No NAS mapping found for user profile ID: ' || p_user_profile_id;
-        END IF;
-
-        -- Construct the POST_MEDIA_URL by concatenating the base URL and media file name
-        v_post_media_url := v_base_url_path || '/' || p_post_media_name;
-
-        -- Insert the record into POST_MEDIA
-        INSERT INTO POST_MEDIA (
-            POST_ID,
-            POST_MEDIA_ID,
-            POST_MEDIA_TYPE,
-            POST_MEDIA_NAME,
-            POST_MEDIA_URL,
-            CREATION_DATETIME
-        )
-        VALUES (
-            p_post_id,
-            p_post_media_id,
-            p_post_media_type,
-            p_post_media_name,
-            v_post_media_url,
-            CURRENT_TIMESTAMP
-        );
-
-        -- If insert is successful, return a success message
-        RETURN 'Success: Media stored successfully for post ID ' || p_post_id;
-
-    EXCEPTION
-        WHEN OTHERS THEN
-            -- Handle any errors by rolling back and returning a failure message
-            RETURN 'Failure: An error occurred while storing media. ' || SQLERRM;
-    END;
-END;
-$$ LANGUAGE plpgsql;
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
